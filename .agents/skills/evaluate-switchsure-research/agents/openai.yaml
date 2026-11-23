@@ -1,0 +1,4 @@
+interface:
+  display_name: "SwitchSure Evaluation"
+  short_description: "Run reproducible risk-aware speech evaluation"
+  default_prompt: "Use $evaluate-switchsure-research to evaluate a SwitchSure model or policy reproducibly."

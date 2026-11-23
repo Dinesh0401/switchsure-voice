@@ -1,0 +1,4 @@
+interface:
+  display_name: "SwitchSure API Engineering"
+  short_description: "Build safe typed speech-processing APIs"
+  default_prompt: "Use $build-switchsure-api to implement a safe typed SwitchSure API change."

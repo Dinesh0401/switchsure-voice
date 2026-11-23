@@ -1,0 +1,66 @@
+[project]
+name = "switchsure-workspace"
+version = "0.1.0"
+description = "Uncertainty-aware multilingual voice accessibility research platform"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "switchsure-api",
+  "switchsure-core",
+  "switchsure-eval",
+  "switchsure-ml",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.27,<1",
+  "mypy>=1.13,<2",
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<7",
+  "ruff>=0.8,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+  "apps/api",
+  "packages/switchsure-core",
+  "packages/switchsure-eval",
+  "packages/switchsure-ml",
+]
+
+[tool.uv.sources]
+switchsure-api = { workspace = true }
+switchsure-core = { workspace = true }
+switchsure-eval = { workspace = true }
+switchsure-ml = { workspace = true }
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["switchsure_api", "switchsure_core", "switchsure_eval", "switchsure_ml"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 85
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SwitchSure Accessible Voice UI"
+  short_description: "Build accessible multilingual voice interfaces"
+  default_prompt: "Use $build-accessible-voice-ui to implement an accessible SwitchSure voice workflow."

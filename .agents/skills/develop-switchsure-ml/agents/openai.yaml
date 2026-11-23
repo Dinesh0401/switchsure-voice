@@ -1,0 +1,4 @@
+interface:
+  display_name: "SwitchSure ML Research"
+  short_description: "Develop calibrated multilingual speech models"
+  default_prompt: "Use $develop-switchsure-ml to design or implement a calibrated SwitchSure ML experiment."
