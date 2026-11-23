@@ -56,9 +56,22 @@ configs/               Preregistered, machine-readable experiment contracts
 
 ## Current phase
 
-Phase 0 is complete. Phase 1 engineering readiness now includes immutable dataset manifests, speaker/session leakage rejection, lazy faster-whisper and Hugging Face evidence adapters, versioned normalization, explicit failure taxonomy, speaker-level bootstrap intervals, and machine-evaluated release gates.
+Phase 0 is complete. Phase 1 engineering now includes a fail-closed, privacy-safe Whisper benchmark
+runner in addition to immutable manifests, leakage rejection, model-neutral adapters, normalization,
+bootstrap intervals, and release gates. Common Voice 27 Tamil and English are approved only as real
+monolingual controls; no natural Tamil-English corpus has yet passed the full access/consent and
+annotation review. Therefore no real zero-shot score is claimed. See the
+[execution record](docs/research/phase1-whisper-execution.md) and
+[dataset decisions](docs/data/dataset-inventory.md).
 
-Scientific Phase 1 is **not yet complete**: no dataset is admitted until license and consent evidence are verified, model revisions remain intentionally unpinned, and no zero-shot result has been produced. See the [study plan](docs/research/phase1-study-plan.md), [dataset inventory](docs/data/dataset-inventory.md), and [roadmap](docs/roadmap.md).
+Phase 2 engineering adds train-only boundary/error heads, calibration-only temperature scaling,
+matched non-boundary controls, and a declared boundary-aware ablation. Phase 3 engineering adds
+Tamil-English structured-entity recognition, reversible canonicalization, and a time-aligned
+candidate lattice that routes competing values to review. Both phases still require the approved
+real-speech study before any performance claim. See the
+[Phase 2 plan](docs/research/phase2-boundary-aware-plan.md),
+[Phase 3 contract](docs/research/phase3-critical-entity-preservation.md), and
+[roadmap](docs/roadmap.md).
 
 The current scorer is an intentionally transparent, uncalibrated baseline. It is suitable for architecture and interaction testing, not for medical, financial, or other consequential decisions. Promotion to a real-world pilot is gated by the speaker-disjoint evaluation contract.
 

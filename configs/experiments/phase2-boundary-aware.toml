@@ -1,0 +1,77 @@
+schema_version = "1.0"
+experiment_id = "phase2-tamil-english-boundary-uncertainty"
+status = "preregistered"
+seed = 20261123
+normalization_version = "switchsure-normalization-v1"
+primary_comparison = "boundary-aware-error-head-vs-matched-baseline-error-head"
+primary_metric = "aurc"
+locked_test_access_budget = 1
+
+[hypothesis]
+statement = "Boundary posterior and boundary entropy improve calibrated word-error ranking over matched non-boundary features on speaker-disjoint Tamil-English speech."
+user_failure = "A critical word near a Tamil-English switch is accepted despite unstable recognition evidence."
+expected_direction = "aurc_boundary_aware < aurc_baseline"
+stopping_rule = "Select model and calibration method on validation data, then stop after one locked-test comparison for this experiment ID."
+
+[data]
+manifest = "artifacts/manifests/phase2-manifest.json"
+required_splits = ["train", "calibration", "validation", "test"]
+speaker_disjoint = true
+session_disjoint = true
+allow_unknown_license = false
+allow_synthetic_locked_test = false
+gold_boundary_labels_required = true
+gold_word_error_labels_required = true
+
+[backbone]
+phase1_evidence_artifact = "UNPINNED"
+model_id = "UNPINNED"
+model_revision = "UNPINNED"
+
+[boundary_head]
+family = "regularized_logistic"
+features = ["lid_entropy", "language_transition_evidence", "timestamp_gap_ms", "hypothesis_disagreement"]
+class_balancing = true
+l2 = 0.01
+learning_rate = 0.08
+iterations = 500
+
+[error_head]
+family = "regularized_logistic"
+baseline_features = ["decoder_error_evidence", "lid_entropy", "hypothesis_disagreement", "token_length", "is_entity"]
+boundary_features = ["boundary_probability", "boundary_entropy"]
+class_balancing = true
+l2 = 0.01
+learning_rate = 0.08
+iterations = 500
+
+[calibration]
+method = "temperature_scaling"
+fit_split = "calibration"
+selection_split = "validation"
+selection_metrics = ["nll", "brier", "aurc"]
+forbid_test_fit = true
+
+[matched_controls]
+exact_fields = ["language", "is_entity", "acoustic_band", "token_length_band"]
+prefer_same_speaker = true
+reuse_controls = false
+report_unmatched = true
+
+[metrics]
+switching = ["boundary_precision", "boundary_recall", "boundary_f1", "tolerance_window_f1"]
+uncertainty = ["nll", "brier", "adaptive_ece", "maximum_calibration_error", "aurc", "risk_at_coverage"]
+matched = ["boundary_vs_control_error_delta", "boundary_vs_control_entropy_delta"]
+entities = ["critical_entity_recall", "high_severity_accepted_error_rate"]
+
+[reporting]
+bootstrap_unit = "speaker"
+bootstrap_resamples = 10000
+confidence_level = 0.95
+minimum_reportable_subgroup = 20
+seeds = [20261123, 20261124, 20261125]
+report_negative_results = true
+
+[release]
+autonomous_high_stakes_use = false
+require_human_review_for_critical_values = true

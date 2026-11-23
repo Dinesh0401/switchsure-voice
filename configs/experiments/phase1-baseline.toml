@@ -25,6 +25,8 @@ allow_synthetic_locked_test = false
 adapter = "faster-whisper"
 model_id = "large-v3-turbo"
 model_revision = "UNPINNED"
+# Required for execution: an absolute or repository-relative immutable CTranslate2 snapshot.
+# local_snapshot_path = "artifacts/models/large-v3-turbo/<content-addressed-snapshot>"
 device = "auto"
 compute_type = "auto"
 beam_size = 5

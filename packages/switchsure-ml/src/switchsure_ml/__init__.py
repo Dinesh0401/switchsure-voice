@@ -25,6 +25,22 @@ from .asr_contracts import (
     TranscriptAlternative,
     WordEvidence,
 )
+from .boundary_uncertainty import (
+    BoundaryAwareUncertaintyModel,
+    BoundaryFeatureMode,
+    BoundaryObservation,
+    BoundaryUncertaintyOutput,
+    ControlMatchResult,
+    MatchedBoundaryPair,
+    match_boundary_controls,
+)
+from .data_governance import (
+    ApprovalDecision,
+    DatasetApproval,
+    DatasetUse,
+    DatasetUseNotApproved,
+    require_approved_dataset,
+)
 from .dataset_manifest import (
     DataRecord,
     DatasetManifest,
@@ -34,6 +50,15 @@ from .dataset_manifest import (
     IssueSeverity,
     ManifestIssue,
     ManifestValidationError,
+)
+from .entity_lattice import (
+    EntityHypothesis,
+    EntityKind,
+    EntityLattice,
+    EntityRoute,
+    build_entity_lattice,
+    canonicalize_entity,
+    recognize_structured_entities,
 )
 from .uncertainty import (
     conformal_quantile,
@@ -45,6 +70,7 @@ from .uncertainty import (
 
 __all__ = [
     "AdapterOutputError",
+    "ApprovalDecision",
     "AsrAdapterError",
     "AsrEvidence",
     "AsrEvidencePort",
@@ -53,12 +79,24 @@ __all__ = [
     "AsrRequest",
     "AsrTask",
     "AudioSource",
+    "BoundaryAwareUncertaintyModel",
+    "BoundaryFeatureMode",
+    "BoundaryObservation",
+    "BoundaryUncertaintyOutput",
+    "ControlMatchResult",
     "DataRecord",
     "DataSplit",
+    "DatasetApproval",
     "DatasetManifest",
     "DatasetSource",
+    "DatasetUse",
+    "DatasetUseNotApproved",
     "DecoderScore",
     "DecoderScoreKind",
+    "EntityHypothesis",
+    "EntityKind",
+    "EntityLattice",
+    "EntityRoute",
     "EvidenceStatus",
     "FasterWhisperAdapter",
     "FixtureAsrAdapter",
@@ -67,15 +105,21 @@ __all__ = [
     "LanguageEvidence",
     "ManifestIssue",
     "ManifestValidationError",
+    "MatchedBoundaryPair",
     "MissingOptionalDependencyError",
     "SegmentEvidence",
     "TimeSpan",
     "TokenEvidence",
     "TranscriptAlternative",
     "WordEvidence",
+    "build_entity_lattice",
+    "canonicalize_entity",
     "conformal_quantile",
+    "match_boundary_controls",
     "normalized_entropy",
     "pairwise_sequence_disagreement",
     "prediction_set",
     "predictive_mutual_information",
+    "recognize_structured_entities",
+    "require_approved_dataset",
 ]

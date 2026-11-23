@@ -10,9 +10,10 @@
 ## Phase 1 — Reproducible baseline study 🟡
 
 Engineering status: manifests, leakage checks, adapter contracts, fixture-tested optional backends,
-normalization, preregistration, bootstrap comparison, error taxonomy, and release-gate evaluation are
-implemented. Scientific status: awaiting verified data admission, pinned model revisions, declared
-reference hardware, and the single locked-test baseline run.
+normalization, preregistration, bootstrap comparison, error taxonomy, release-gate evaluation, and a
+privacy-safe fail-closed benchmark runner are implemented. Common Voice v27 Tamil/English are
+approved only for monolingual controls. Scientific status: awaiting approved natural Tamil-English
+data, a pinned local model snapshot, declared reference hardware, and the single locked-test run.
 
 - Complete dataset license/consent inventory and manifests.
 - Build speaker-disjoint Tamil-English and monolingual control splits.
@@ -21,12 +22,21 @@ reference hardware, and the single locked-test baseline run.
 
 ## Phase 2 — Boundary-aware uncertainty
 
+Engineering status: dependency-light class-balanced boundary/error heads, baseline ablation,
+calibration-only temperature scaling, split-isolation checks, and matched controls are implemented
+and preregistered. Scientific status: no real-corpus training or three-seed comparison yet.
+
 - Annotate or derive token LID and switch boundaries.
 - Train token-LID/boundary head and word-confidence estimator.
 - Calibrate on held-out speakers and evaluate risk-coverage behavior.
 - Run feature and calibration ablations.
 
 ## Phase 3 — Entity preservation
+
+Engineering status: deterministic Tamil-English structured-value recognition, immutable surfaces,
+reversible canonicalization, candidate-lattice evidence, and conservative review routing are
+implemented. Scientific status: contextual-bias, distractor, per-type risk, and user-study results
+remain pending approved data.
 
 - Add structured-value recognizers and multilingual span model.
 - Add candidate-lattice evidence, phonetic matching, and contextual biasing.

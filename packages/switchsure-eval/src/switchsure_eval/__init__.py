@@ -34,12 +34,28 @@ from .metrics import (
     word_error_rate,
 )
 from .normalization import NORMALIZATION_VERSION, NormalizedTranscript, normalize_transcript
+from .whisper_benchmark import (
+    AggregateResult,
+    BenchmarkArtifact,
+    BenchmarkBackend,
+    BenchmarkConfig,
+    PreflightIssue,
+    RecordOutcome,
+    RunStatus,
+    preflight,
+    run_benchmark,
+    write_artifact,
+)
 
 __all__ = [
     "NORMALIZATION_VERSION",
     "PHASE1_RELEASE_GATES",
+    "AggregateResult",
     "ArtifactRevision",
     "BaselineExperimentSpec",
+    "BenchmarkArtifact",
+    "BenchmarkBackend",
+    "BenchmarkConfig",
     "BootstrapInterval",
     "DatasetPartition",
     "EditCounts",
@@ -53,8 +69,11 @@ __all__ = [
     "NormalizedTranscript",
     "OutcomeCounts",
     "PredictionOutcome",
+    "PreflightIssue",
+    "RecordOutcome",
     "ReleaseDecision",
     "ReleaseGate",
+    "RunStatus",
     "SpeakerMetricPair",
     "SplitManifest",
     "SubgroupObservation",
@@ -64,8 +83,11 @@ __all__ = [
     "expected_calibration_error",
     "normalize_transcript",
     "paired_speaker_bootstrap",
+    "preflight",
     "risk_coverage_curve",
+    "run_benchmark",
     "summarize_subgroups",
     "word_error_counts",
     "word_error_rate",
+    "write_artifact",
 ]

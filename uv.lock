@@ -689,6 +689,12 @@ source = { editable = "packages/switchsure-core" }
 name = "switchsure-eval"
 version = "0.1.0"
 source = { editable = "packages/switchsure-eval" }
+dependencies = [
+    { name = "switchsure-ml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "switchsure-ml", editable = "packages/switchsure-ml" }]
 
 [[package]]
 name = "switchsure-ml"

@@ -1,29 +1,35 @@
 # Phase 1 dataset inventory and manifest template
 
-## Governance status
+## Governance status (reviewed 2026-11-23)
 
-This is a discovery inventory, not permission to download, train on, redistribute, or publish any
-dataset. Every external candidate below is **unverified** until a dated review records the exact
-dataset version, authoritative terms, consent basis, provenance, speaker/session identifiers, and
-the intended use. A model-card license, paper-access license, or repository license does not by
-itself establish permission for the underlying speech data.
+The machine-readable decision record is
+[`configs/data/dataset-approvals.toml`](../../configs/data/dataset-approvals.toml). Approval is scoped
+to an exact version and experiment role; it never implies that access has been granted. No external
+audio was downloaded during this review.
 
-No data has been downloaded as part of this inventory.
+Two real-speech sources are approved **only for monolingual controls**: Common Voice Scripted Speech
+27.0 Tamil and English. No natural Tamil-English source has yet cleared access, consent, annotation,
+speaker/session, and immutable-version review, so the locked code-switch benchmark remains blocked.
+This is a governance result, not missing paperwork that may be bypassed.
 
 ## Candidate inventory
 
-| Candidate | Potential role | Tamil-English code-switch evidence | License | Consent / participant terms | Speaker/session IDs | Decision |
-|---|---|---|---|---|---|---|
-| Purpose-built SwitchSure pilot | Primary natural Tamil-English target set with critical entities and accessibility tasks | Must be collected and annotated | Not yet drafted | Not yet drafted; requires accessible informed consent and withdrawal/retention policy | Must be assigned before collection | Blocked pending protocol and ethics/privacy review |
-| [MUCS challenge data](https://arxiv.org/abs/2104.00235) | Indian multilingual/code-switch benchmark candidate | Paper indicates Indian multilingual and code-switching tasks; exact Tamil-English subset must be verified | **Unknown / unverified** | **Unknown / unverified** | **Unknown / unverified** | Discovery only |
-| [Mozilla Common Voice Tamil](https://commonvoice.mozilla.org/en/datasets) | Tamil monolingual control and acoustic diversity candidate | Not assumed to be code-switched | **Version-specific terms unverified** | **Version-specific collection/consent terms unverified** | Availability and stability unverified | Discovery only |
-| [FLEURS](https://huggingface.co/datasets/google/fleurs) Tamil (`ta_in`) | Tamil monolingual control and adapter smoke tests | Not assumed to be code-switched | **Dataset/audio terms unverified for intended use** | **Collection and participant terms unverified** | Availability and stability unverified | Discovery only |
-| [IndicVoices](https://indicvoices.ai4bharat.org/) | Natural Indian-language speech and acoustic-control candidate | Tamil availability and natural Tamil-English switching must be verified | **Version-specific terms unverified** | **Collection and participant terms unverified** | Availability and stability unverified | Discovery only |
-| [LT-EDI Tamil ASR 2025](https://aclanthology.org/2025.ltedi-1.16/) resources | Accessibility-oriented Tamil evaluation candidate, including declared speaker slices | Dataset availability and English switching must be verified | **Unknown / unverified** | **Unknown / unverified** | **Unknown / unverified** | Paper evidence only; no data use approved |
+| Candidate | Potential role | Tamil-English evidence | Governance evidence | Speaker/session suitability | Decision |
+|---|---|---|---|---|---|
+| Purpose-built SwitchSure pilot | Critical-entity and accessibility target set | Must be collected | Protocol, consent, withdrawal and retention terms not drafted | Must be assigned before collection | **Blocked** |
+| [Common Voice 27 Tamil](https://mozilladatacollective.com/datasets/cmu5x7cbc00dqo1071wdidlpf) | Tamil real-speech control | Monolingual read speech, not code-switched | CC0-1.0; contribution terms reviewed; no redistribution/re-identification | 984 speakers reported; regenerate disjoint splits from delivered metadata | **Approved: monolingual control only** |
+| [Common Voice 27 English](https://mozilladatacollective.com/datasets?locale=en&q=Common+Voice+Scripted+Speech) | English real-speech control | Monolingual read speech, not code-switched | CC0-1.0; same Common Voice restrictions | Must pin delivered metadata and prefer declared South-Asian accent controls | **Approved: monolingual control only** |
+| [Zhagaram Tamil/Tanglish](https://huggingface.co/datasets/zhagaramlabs/tamil-conversational-speech) | Natural target corpus | Card claims 603.3 hours of Tanglish | Gated custom license; public evidence does not complete consent/use review | Conversation IDs are described; stable speakers and human references need inspection | **Conditional; blocked pending access and review** |
+| [Tamil-English podcast diarization](https://huggingface.co/datasets/Rangasuthan/tamil-english-podcast-diarization) | Exploratory natural audio | Two code-mixed podcasts | Card mixes CC-BY-4.0 with research/non-commercial restrictions; reference transcripts are not contracted | Two recordings, narrow domain, unsuitable independence | **Rejected for ASR benchmark** |
+| [MUCS 2021](https://navana-tech.github.io/MUCS2021/data.html) Tamil | Previously proposed benchmark | Authoritative page/paper make Tamil monolingual; only Hindi-English and Bengali-English are code-switched | Dataset terms do not cure the language-pair mismatch | Not evaluated because target role is invalid | **Rejected as Tamil-English code-switch data** |
+| [IMDA National Speech Corpus](https://www.imda.gov.sg/-/media/imda/files/industry-development/infrastructure/technology/digital-services-lab/2018-11-22-fact-sheet-for-ai-open-source-subfinal-v3_2.pdf) conversational collection | Natural target candidate | Secondary descriptions indicate English/Tamil switching may exist | Singapore Open Data License evidence found; exact acquired part and participant terms not inspected | Requires exact package, speaker/session, transcript audit | **Conditional; blocked pending official access** |
+| [Controlled-access 2026 Tamil-English corpus](https://doi.org/10.1186/s13636-026-00477-y) | Natural target candidate | Paper describes 10 hours / 1,034 real utterances | Institutional approval and DUA required; artifact absent | Paper claims speaker-disjoint data; delivery still must be audited | **Conditional; blocked pending DUA and artifact** |
+| FLEURS, IndicVoices, LT-EDI resources | Auxiliary candidates | Not established as natural Tamil-English switching | Exact release/consent review incomplete | Not reviewed | **Unverified; no use approved** |
 
-The Phase 1 baseline should combine a verified natural Tamil-English target set with verified Tamil
-and English monolingual controls. Synthetic switching may be used only as a separately labeled
-training ablation; it must never enter the locked real-speech test set.
+The Phase 1 baseline must combine an approved natural Tamil-English target set with the approved
+Tamil and English controls. Synthetic switching may be used only as a separately labelled training
+ablation; it must never enter the locked real-speech test set. Public availability, a repository
+license, or a paper claim alone is insufficient for approval.
 
 ## Required manifest entry
 

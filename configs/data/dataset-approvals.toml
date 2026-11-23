@@ -1,0 +1,107 @@
+schema_version = "1.0.0"
+reviewed_on = "2026-11-23"
+policy = "An approval is exact-version and exact-use; it does not imply data access."
+
+[[dataset]]
+id = "common-voice-scripted-ta"
+title = "Common Voice Scripted Speech 27.0 - Tamil"
+version = "cv-corpus-27.0-2026-09-11"
+decision = "approved"
+permitted_uses = ["monolingual_control"]
+license = "CC0-1.0"
+conditions = [
+  "Download only through Mozilla Data Collective.",
+  "Do not re-host, redistribute, identify, or re-identify speakers.",
+  "Regenerate speaker-disjoint splits from client_id/session-safe metadata and hash them.",
+]
+evidence = [
+  "https://mozilladatacollective.com/datasets/cmu5x7cbc00dqo1071wdidlpf",
+  "https://commonvoice.mozilla.org/terms/en.html",
+]
+rationale = "Approved only as a real Tamil monolingual control; it is not Tamil-English code-switched speech."
+
+[[dataset]]
+id = "common-voice-scripted-en"
+title = "Common Voice Scripted Speech 27.0 - English"
+version = "cv-corpus-27.0-2026-09-11"
+decision = "approved"
+permitted_uses = ["monolingual_control"]
+license = "CC0-1.0"
+conditions = [
+  "Download only through Mozilla Data Collective.",
+  "Do not re-host, redistribute, identify, or re-identify speakers.",
+  "Prefer a declared South-Asian-accent control and preserve speaker-disjoint partitions.",
+]
+evidence = [
+  "https://mozilladatacollective.com/datasets?locale=en&q=Common+Voice+Scripted+Speech",
+  "https://commonvoice.mozilla.org/terms/en.html",
+]
+rationale = "Approved only as a real English monolingual control; it cannot establish code-switch performance."
+
+[[dataset]]
+id = "zhagaram-tamil-conversational"
+title = "Zhagaram Labs Tamil & Tanglish Conversational Speech Corpus"
+version = "unversioned-card-reviewed-2026-11-23"
+decision = "conditional"
+permitted_uses = []
+conditions = [
+  "Obtain explicit whitelist approval and the complete license text.",
+  "Verify participant consent, withdrawal, retention, and commercial/product research permissions.",
+  "Verify human reference transcripts, stable speaker IDs, and conversation/session IDs in delivered files.",
+  "Pin an immutable dataset revision and content hashes before any experiment.",
+]
+evidence = ["https://huggingface.co/datasets/zhagaramlabs/tamil-conversational-speech"]
+rationale = "Promising natural Tamil-English source, but gated access and the public card do not complete consent or annotation review."
+
+[[dataset]]
+id = "tamil-english-podcast-diarization"
+title = "Tamil-English Code-Mixed Podcast Diarization Dataset"
+version = "unversioned-card-reviewed-2026-11-23"
+decision = "rejected"
+permitted_uses = []
+conditions = []
+evidence = ["https://huggingface.co/datasets/Rangasuthan/tamil-english-podcast-diarization"]
+rationale = "Not accepted for ASR benchmarking: only two long recordings, no verified utterance-level reference transcript contract, narrow speakers/domain, and inconsistent CC-BY versus research/non-commercial wording."
+
+[[dataset]]
+id = "mucs-2021-tamil"
+title = "MUCS 2021 Tamil"
+version = "2021-official-challenge-release"
+decision = "rejected"
+permitted_uses = []
+conditions = []
+evidence = [
+  "https://navana-tech.github.io/MUCS2021/data.html",
+  "https://www.isca-archive.org/interspeech_2021/diwan21_interspeech.html",
+]
+rationale = "The authoritative challenge describes Tamil as monolingual; only Hindi-English and Bengali-English are code-switched. It is therefore invalid as the claimed Tamil-English switch benchmark."
+
+[[dataset]]
+id = "imda-national-speech-corpus-part4"
+title = "IMDA National Speech Corpus conversational/code-switching collection"
+version = "access-request-required"
+decision = "conditional"
+permitted_uses = []
+conditions = [
+  "Obtain the official corpus and pin the exact part/release.",
+  "Verify that the acquired partition contains English-Tamil natural switching and gold transcripts.",
+  "Review participant terms and confirm stable speaker/session identifiers before splitting.",
+]
+evidence = [
+  "https://www.imda.gov.sg/-/media/imda/files/industry-development/infrastructure/technology/digital-services-lab/2018-11-22-fact-sheet-for-ai-open-source-subfinal-v3_2.pdf"
+]
+rationale = "License evidence is encouraging, but the exact Tamil-English artifact, annotations, consent evidence, and access package have not been inspected."
+
+[[dataset]]
+id = "custom-tamil-english-2026"
+title = "Controlled-access Tamil-English corpus described by Sangeetha et al. (2026)"
+version = "paper-description-only"
+decision = "conditional"
+permitted_uses = []
+conditions = [
+  "Receive institutional approval and execute the data-use agreement.",
+  "Inspect consent, anonymization, speaker/session keys, allowed purposes, and redistribution restrictions.",
+  "Pin the delivered artifact and create a four-way speaker/session-disjoint split.",
+]
+evidence = ["https://doi.org/10.1186/s13636-026-00477-y"]
+rationale = "The paper describes real consented Tamil-English speech, but access is controlled and no DUA or artifact is available in this workspace."
