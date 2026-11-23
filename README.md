@@ -50,12 +50,15 @@ packages/
   switchsure-ml/       ASR, language-ID, entity, and calibration adapters
   switchsure-eval/     Reproducible evaluation and reporting
 docs/                  Product, architecture, research, security, and ADRs
+configs/               Preregistered, machine-readable experiment contracts
 .agents/skills/         Repository-local agent skills
 ```
 
 ## Current phase
 
-Phase 0 establishes the architecture, evaluation protocol, and safe vertical slice before any expensive model training. See [docs/roadmap.md](docs/roadmap.md).
+Phase 0 is complete. Phase 1 engineering readiness now includes immutable dataset manifests, speaker/session leakage rejection, lazy faster-whisper and Hugging Face evidence adapters, versioned normalization, explicit failure taxonomy, speaker-level bootstrap intervals, and machine-evaluated release gates.
+
+Scientific Phase 1 is **not yet complete**: no dataset is admitted until license and consent evidence are verified, model revisions remain intentionally unpinned, and no zero-shot result has been produced. See the [study plan](docs/research/phase1-study-plan.md), [dataset inventory](docs/data/dataset-inventory.md), and [roadmap](docs/roadmap.md).
 
 The current scorer is an intentionally transparent, uncalibrated baseline. It is suitable for architecture and interaction testing, not for medical, financial, or other consequential decisions. Promotion to a real-world pilot is gated by the speaker-disjoint evaluation contract.
 

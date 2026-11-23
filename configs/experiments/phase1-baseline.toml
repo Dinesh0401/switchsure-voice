@@ -1,0 +1,59 @@
+schema_version = "1.0"
+experiment_id = "phase1-tamil-english-zero-shot"
+status = "preregistered"
+seed = 20261123
+normalization_version = "switchsure-normalization-v1"
+primary_comparison = "faster-whisper-zero-shot-vs-raw-decoder-risk"
+primary_metric = "switch_region_wer"
+locked_test_access_budget = 1
+
+[hypothesis]
+statement = "Zero-shot multilingual Whisper will have higher word error near true Tamil-English switch boundaries than on matched non-boundary words."
+user_failure = "A critical value spoken near a language switch is silently transcribed incorrectly."
+expected_direction = "switch_region_wer > matched_non_boundary_wer"
+stopping_rule = "Stop baseline analysis after one locked-test evaluation; changes require a new experiment id and untouched test set."
+
+[data]
+manifest = "artifacts/manifests/phase1-manifest.json"
+required_splits = ["train", "calibration", "validation", "test"]
+speaker_disjoint = true
+session_disjoint = true
+allow_unknown_license = false
+allow_synthetic_locked_test = false
+
+[backbone]
+adapter = "faster-whisper"
+model_id = "large-v3-turbo"
+model_revision = "UNPINNED"
+device = "auto"
+compute_type = "auto"
+beam_size = 5
+word_timestamps = true
+vad_filter = true
+multilingual = true
+
+[controls]
+language_hint = false
+hotwords = false
+entity_guard = false
+calibrated_policy = false
+
+[metrics]
+recognition = ["wer", "cer", "switch_region_wer", "per_language_wer"]
+uncertainty = ["nll", "brier", "adaptive_ece", "maximum_calibration_error", "aurc"]
+entities = ["critical_entity_recall", "entity_value_accuracy", "high_severity_accepted_error_rate"]
+systems = ["latency_p50_ms", "latency_p95_ms", "real_time_factor", "peak_memory_mb"]
+
+[reporting]
+bootstrap_unit = "speaker"
+bootstrap_resamples = 10000
+confidence_level = 0.95
+minimum_reportable_subgroup = 20
+record_missing_predictions = true
+record_timeouts = true
+record_invalid_audio = true
+record_abstentions = true
+
+[release]
+autonomous_high_stakes_use = false
+require_human_review_for_critical_values = true

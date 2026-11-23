@@ -1,13 +1,18 @@
 # Roadmap
 
-## Phase 0 — Contracts and safe vertical slice
+## Phase 0 — Contracts and safe vertical slice ✅
 
 - Freeze domain and API contracts for a risk-bearing transcript.
 - Implement deterministic baseline risk aggregation and entity policy.
 - Ship an accessible browser workflow using a deterministic demo adapter.
 - Establish unit, contract, accessibility, and architecture checks.
 
-## Phase 1 — Reproducible baseline study
+## Phase 1 — Reproducible baseline study 🟡
+
+Engineering status: manifests, leakage checks, adapter contracts, fixture-tested optional backends,
+normalization, preregistration, bootstrap comparison, error taxonomy, and release-gate evaluation are
+implemented. Scientific status: awaiting verified data admission, pinned model revisions, declared
+reference hardware, and the single locked-test baseline run.
 
 - Complete dataset license/consent inventory and manifests.
 - Build speaker-disjoint Tamil-English and monolingual control splits.

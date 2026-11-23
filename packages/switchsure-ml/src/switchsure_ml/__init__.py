@@ -1,5 +1,40 @@
-"""Mathematical utilities used by SwitchSure ML adapters."""
+"""Model-neutral multilingual speech research contracts and utilities."""
 
+from .asr_adapters import (
+    AdapterOutputError,
+    AsrAdapterError,
+    FasterWhisperAdapter,
+    FixtureAsrAdapter,
+    HuggingFaceWhisperAdapter,
+    MissingOptionalDependencyError,
+)
+from .asr_contracts import (
+    AsrEvidence,
+    AsrEvidencePort,
+    AsrOptions,
+    AsrProvenance,
+    AsrRequest,
+    AsrTask,
+    AudioSource,
+    DecoderScore,
+    DecoderScoreKind,
+    LanguageEvidence,
+    SegmentEvidence,
+    TimeSpan,
+    TokenEvidence,
+    TranscriptAlternative,
+    WordEvidence,
+)
+from .dataset_manifest import (
+    DataRecord,
+    DatasetManifest,
+    DatasetSource,
+    DataSplit,
+    EvidenceStatus,
+    IssueSeverity,
+    ManifestIssue,
+    ManifestValidationError,
+)
 from .uncertainty import (
     conformal_quantile,
     normalized_entropy,
@@ -9,6 +44,35 @@ from .uncertainty import (
 )
 
 __all__ = [
+    "AdapterOutputError",
+    "AsrAdapterError",
+    "AsrEvidence",
+    "AsrEvidencePort",
+    "AsrOptions",
+    "AsrProvenance",
+    "AsrRequest",
+    "AsrTask",
+    "AudioSource",
+    "DataRecord",
+    "DataSplit",
+    "DatasetManifest",
+    "DatasetSource",
+    "DecoderScore",
+    "DecoderScoreKind",
+    "EvidenceStatus",
+    "FasterWhisperAdapter",
+    "FixtureAsrAdapter",
+    "HuggingFaceWhisperAdapter",
+    "IssueSeverity",
+    "LanguageEvidence",
+    "ManifestIssue",
+    "ManifestValidationError",
+    "MissingOptionalDependencyError",
+    "SegmentEvidence",
+    "TimeSpan",
+    "TokenEvidence",
+    "TranscriptAlternative",
+    "WordEvidence",
     "conformal_quantile",
     "normalized_entropy",
     "pairwise_sequence_disagreement",
