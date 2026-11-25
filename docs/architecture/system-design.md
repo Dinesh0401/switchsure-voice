@@ -218,5 +218,6 @@ See [../security/threat-model.md](../security/threat-model.md). Core controls ar
 - [ADR-0001: Python-first modular monolith](../adr/0001-python-first-modular-monolith.md)
 - [ADR-0002: Risk-bearing transcript contract](../adr/0002-risk-bearing-transcript.md)
 - [ADR-0003: Calibrate before user-facing confidence](../adr/0003-calibrated-selective-prediction.md)
+- [ADR-0004: Ephemeral content with durable job metadata](../adr/0004-ephemeral-content-durable-job-metadata.md)
 
 The formal objectives, uncertainty decomposition, entity lattice, selective-prediction policy, conformal option, and budgeted inference cascade are specified in [mathematical methods](../research/mathematical-methods.md).

@@ -15,6 +15,18 @@ from .domain import (
     WordEvidence,
 )
 from .entities import detect_structured_entities
+from .jobs import (
+    InvalidJobTransitionError,
+    JobLease,
+    JobNotFoundError,
+    JobQueueError,
+    JobResultUnavailableError,
+    JobSnapshot,
+    JobState,
+    PilotJobQueue,
+    QueueFullError,
+    RetentionClass,
+)
 from .orchestrator import analyze_transcript
 from .risk import CostSensitivePolicy, HeuristicRiskModel
 
@@ -29,7 +41,17 @@ __all__ = [
     "EntityEvidence",
     "EntityType",
     "HeuristicRiskModel",
+    "InvalidJobTransitionError",
+    "JobLease",
+    "JobNotFoundError",
+    "JobQueueError",
+    "JobResultUnavailableError",
+    "JobSnapshot",
+    "JobState",
     "LanguageProbability",
+    "PilotJobQueue",
+    "QueueFullError",
+    "RetentionClass",
     "RiskBearingTranscript",
     "TranscriptEvidence",
     "WordEvidence",
