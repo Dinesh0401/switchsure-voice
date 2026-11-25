@@ -28,6 +28,7 @@ Run validation first; do not use the locked test split for setup:
 uv run python -m switchsure_eval.whisper_benchmark_cli `
   --config configs/experiments/phase1-baseline.toml `
   --manifest artifacts/manifests/phase1-manifest.json `
+  --approvals configs/data/dataset-approvals.toml `
   --data-root data/approved/phase1 `
   --output artifacts/benchmarks/phase1-validation.json `
   --split validation
@@ -47,7 +48,8 @@ without persisting exception text.
 
 ## Conditions for a scientific result
 
-1. Approve a versioned Tamil-English source for the declared research use and retention policy.
+1. Approve an exact version of a Tamil-English source for `code_switch_evaluation` in the
+   machine-readable approval registry (and separately for `locked_test` before test access).
 2. Materialize a strict manifest with verified license and consent evidence, hashes, and
    speaker/session-disjoint train, calibration, validation, and locked-test partitions.
 3. Install and lock the backend environment.

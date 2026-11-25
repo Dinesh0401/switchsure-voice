@@ -9,10 +9,16 @@ import json
 import subprocess
 import tomllib
 from collections.abc import Mapping, Sequence
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 from switchsure_ml.asr_adapters import FasterWhisperAdapter
+from switchsure_ml.data_governance import (
+    ApprovalDecision,
+    DatasetApproval,
+    DatasetUse,
+)
 from switchsure_ml.dataset_manifest import (
     DataRecord,
     DatasetManifest,
@@ -140,6 +146,43 @@ def _load_manifest(path: Path) -> DatasetManifest:
     )
 
 
+def _load_approvals(path: Path) -> tuple[DatasetApproval, ...]:
+    root = _mapping(tomllib.loads(path.read_text(encoding="utf-8")), "approval registry")
+    raw_datasets = root.get("dataset")
+    if not isinstance(raw_datasets, list):
+        raise ValueError("approval registry dataset must be a list")
+    approvals: list[DatasetApproval] = []
+    for raw in raw_datasets:
+        item = _mapping(raw, "dataset approval")
+        evidence = item.get("evidence")
+        permitted_uses = item.get("permitted_uses")
+        conditions = item.get("conditions", [])
+        if not isinstance(evidence, list) or not all(isinstance(value, str) for value in evidence):
+            raise ValueError("dataset approval evidence must be a list of strings")
+        if not isinstance(permitted_uses, list) or not all(
+            isinstance(value, str) for value in permitted_uses
+        ):
+            raise ValueError("dataset approval permitted_uses must be a list of strings")
+        if not isinstance(conditions, list) or not all(
+            isinstance(value, str) for value in conditions
+        ):
+            raise ValueError("dataset approval conditions must be a list of strings")
+        reviewed_on = item.get("reviewed_on", root.get("reviewed_on"))
+        approvals.append(
+            DatasetApproval(
+                dataset_id=_text(item.get("id"), "dataset approval id"),
+                version=_text(item.get("version"), "dataset approval version"),
+                reviewed_on=date.fromisoformat(_text(reviewed_on, "reviewed_on")),
+                evidence_uris=tuple(evidence),
+                decision=ApprovalDecision(_text(item.get("decision"), "decision")),
+                permitted_uses=frozenset(DatasetUse(value) for value in permitted_uses),
+                conditions=tuple(conditions),
+                rationale=_text(item.get("rationale"), "rationale"),
+            )
+        )
+    return tuple(approvals)
+
+
 def _repo_root(config_path: Path) -> Path:
     for candidate in (config_path.parent, *config_path.parents):
         if (candidate / "uv.lock").is_file() and (candidate / ".git").exists():
@@ -189,6 +232,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--approvals", type=Path, required=True)
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
@@ -208,8 +252,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         allow_locked_test=bool(args.allow_locked_test),
     )
     manifest = _load_manifest(args.manifest.resolve())
+    approvals = _load_approvals(args.approvals.resolve())
     data_root = args.data_root.resolve()
-    issues = preflight(manifest, config, data_root)
+    issues = preflight(manifest, config, data_root, approvals)
     if issues:
         artifact = blocked_artifact(manifest, config, issues)
         write_artifact(args.output.resolve(), artifact)
@@ -229,7 +274,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         compute_type=config.compute_type,
         model_factory=model_factory,
     )
-    artifact = run_benchmark(manifest, config, data_root, adapter)
+    artifact = run_benchmark(manifest, config, data_root, adapter, approvals=approvals)
     write_artifact(args.output.resolve(), artifact)
     print(json.dumps({"status": artifact.status.value, "records": len(artifact.records)}))
     return 0

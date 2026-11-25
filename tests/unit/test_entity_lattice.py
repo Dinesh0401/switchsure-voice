@@ -12,8 +12,10 @@ from switchsure_ml.entity_lattice import (
     recognize_structured_entities,
 )
 
+_PINNED_REVISION = "0123456789abcdef0123456789abcdef01234567"
 
-def provenance(*, revision: str | None = "model-sha-123") -> HypothesisProvenance:
+
+def provenance(*, revision: str | None = _PINNED_REVISION) -> HypothesisProvenance:
     return HypothesisProvenance(
         adapter="fixture",
         model_id="whisper-test",
@@ -27,7 +29,7 @@ def hypothesis(
     surfaces: tuple[str, ...],
     *,
     weight: float = 1.0,
-    revision: str | None = "model-sha-123",
+    revision: str | None = _PINNED_REVISION,
     offset_ms: int = 0,
 ) -> EntityHypothesis:
     words = tuple(
@@ -96,7 +98,7 @@ def test_recognizer_is_deterministic_and_preserves_span_provenance() -> None:
     assert dosage.end_word == 2
     assert dosage.start_ms == 300
     assert dosage.end_ms == 900
-    assert dosage.provenance.model_revision == "model-sha-123"
+    assert dosage.provenance.model_revision == _PINNED_REVISION
 
 
 def test_identical_values_aggregate_evidence_without_becoming_confidence() -> None:
@@ -138,6 +140,37 @@ def test_competing_critical_values_return_all_alternatives_for_review() -> None:
     assert decision.reason_codes == (ReviewReason.COMPETING_VALUES,)
 
 
+def test_entity_deletion_in_aligned_alternative_is_routed_to_review() -> None:
+    entity = hypothesis("beam-1", ("call", "+919876543210"), weight=0.8)
+    deletion = hypothesis("beam-2", ("call", "now"), weight=0.2)
+
+    lattice = build_entity_lattice((entity, deletion))
+
+    assert len(lattice.candidates) == 1
+    decision = lattice.decisions[0]
+    assert decision.route is EntityRoute.REVIEW
+    assert decision.selected_candidate_id is None
+    assert decision.reason_codes == (ReviewReason.MISSING_ENTITY_ALTERNATIVE,)
+
+
+def test_cross_type_interpretations_of_same_interval_are_both_reviewed() -> None:
+    phone = hypothesis("beam-1", ("+919876543210",), weight=0.6)
+    identifier = hypothesis("beam-2", ("AB-12345",), weight=0.4)
+
+    lattice = build_entity_lattice((phone, identifier))
+
+    assert len(lattice.decisions) == 2
+    assert all(decision.route is EntityRoute.REVIEW for decision in lattice.decisions)
+    assert all(
+        ReviewReason.COMPETING_ENTITY_TYPES in decision.reason_codes
+        for decision in lattice.decisions
+    )
+    cross_type_edges = [
+        edge for edge in lattice.edges if edge.relation is EdgeRelation.COMPETING_ENTITY_TYPE
+    ]
+    assert len(cross_type_edges) == 1
+
+
 def test_invalid_locale_dependent_date_is_routed_to_review() -> None:
     item = hypothesis("h1", ("on", "12/11/2026"))
 
@@ -150,6 +183,21 @@ def test_invalid_locale_dependent_date_is_routed_to_review() -> None:
 
 def test_unpinned_model_provenance_cannot_auto_preserve_critical_value() -> None:
     item = hypothesis("h1", ("ID", "AB-12345"), revision=None)
+
+    lattice = build_entity_lattice((item,))
+
+    assert lattice.decisions[0].route is EntityRoute.REVIEW
+    assert lattice.decisions[0].reason_codes == (ReviewReason.MISSING_PINNED_PROVENANCE,)
+
+
+@pytest.mark.parametrize(
+    "floating_revision",
+    ["main", "master", "latest", "HEAD", "dev", "release", "refs/heads/main", "v1.2.3"],
+)
+def test_floating_model_revision_cannot_auto_preserve_critical_value(
+    floating_revision: str,
+) -> None:
+    item = hypothesis("h1", ("ID", "AB-12345"), revision=floating_revision)
 
     lattice = build_entity_lattice((item,))
 
@@ -218,3 +266,13 @@ def test_contract_rejects_duplicate_hypothesis_ids_and_negative_weights() -> Non
     duplicate = hypothesis("same", ("hello",))
     with pytest.raises(ValueError, match="unique"):
         build_entity_lattice((duplicate, duplicate))
+
+
+def test_contract_rejects_non_monotonic_word_timestamps() -> None:
+    words = (
+        EntityWord(0, "first", 500, 800),
+        EntityWord(1, "second", 300, 600),
+    )
+
+    with pytest.raises(ValueError, match="monotonic"):
+        EntityHypothesis("bad-alignment", words, provenance())

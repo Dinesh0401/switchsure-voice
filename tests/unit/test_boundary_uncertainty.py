@@ -37,6 +37,8 @@ def _observation(
         acoustic_band=acoustic_band,
         token_length=token_length,
         is_entity=entity,
+        monolingual_control_eligible=not boundary,
+        nearest_boundary_distance_tokens=0 if boundary else 10,
         decoder_error_evidence=0.85 if error else 0.08,
         lid_entropy=0.90 if boundary else 0.10,
         language_transition_evidence=0.92 if boundary else 0.05,
@@ -79,6 +81,9 @@ def test_observation_rejects_invalid_evidence_without_storing_surface_text() -> 
     assert not hasattr(observation, "surface")
     assert observation.control_stratum == ("ta", False, "clean", 1)
 
+    with pytest.raises(ValueError, match="cannot be negative"):
+        replace(observation, nearest_boundary_distance_tokens=-1)
+
 
 def test_boundary_model_learns_separable_boundary_and_error_evidence() -> None:
     model = BoundaryAwareUncertaintyModel.fit(_training_examples())
@@ -115,6 +120,8 @@ def test_boundary_aware_and_baseline_modes_are_explicit_ablations() -> None:
 
     assert baseline_output.feature_mode is BoundaryFeatureMode.BASELINE
     assert aware_output.feature_mode is BoundaryFeatureMode.BOUNDARY_AWARE
+    assert baseline.boundary_oof_folds is None
+    assert aware.boundary_oof_folds == 5
     assert baseline_output.raw_error_logit != pytest.approx(aware_output.raw_error_logit)
 
 
@@ -219,6 +226,16 @@ def test_training_rejects_an_undeclared_feature_mode() -> None:
         BoundaryAwareUncertaintyModel.fit(_training_examples(), feature_mode="boundary")  # type: ignore[arg-type]
 
 
+def test_boundary_aware_training_requires_speaker_grouped_oof_capacity() -> None:
+    one_speaker = tuple(replace(item, speaker_id="one-speaker") for item in _training_examples())
+
+    with pytest.raises(ValueError, match="cannot exceed"):
+        BoundaryAwareUncertaintyModel.fit(one_speaker, boundary_oof_folds=2)
+
+    with pytest.raises(ValueError, match="at least two"):
+        BoundaryAwareUncertaintyModel.fit(_training_examples(), boundary_oof_folds=1)
+
+
 def test_matched_controls_are_exact_deterministic_and_not_reused() -> None:
     boundary_one = _observation(10, split=DataSplit.TEST, boundary=True, token_length=5)
     boundary_two = _observation(11, split=DataSplit.TEST, boundary=True, token_length=6)
@@ -237,7 +254,8 @@ def test_matched_controls_are_exact_deterministic_and_not_reused() -> None:
     )
 
     result = match_boundary_controls(
-        (boundary_two, closer_other_speaker, boundary_one, preferred_same_speaker)
+        (boundary_two, closer_other_speaker, boundary_one, preferred_same_speaker),
+        boundary_exclusion_radius_tokens=3,
     )
 
     assert tuple(pair.boundary.example_id for pair in result.pairs) == (
@@ -259,12 +277,30 @@ def test_matched_controls_report_unmatched_and_reject_cross_split_matching() -> 
     )
     wrong_stratum = _observation(2, split=DataSplit.TEST, boundary=False, language="ta")
 
-    result = match_boundary_controls((boundary, wrong_stratum))
+    result = match_boundary_controls((boundary, wrong_stratum), boundary_exclusion_radius_tokens=3)
 
     assert result.pairs == ()
     assert result.unmatched_boundary_ids == (boundary.example_id,)
     with pytest.raises(ValueError, match="must not cross"):
-        match_boundary_controls((boundary, replace(wrong_stratum, split=DataSplit.VALIDATION)))
+        match_boundary_controls(
+            (boundary, replace(wrong_stratum, split=DataSplit.VALIDATION)),
+            boundary_exclusion_radius_tokens=3,
+        )
+
+
+def test_matched_controls_require_monolingual_eligibility_and_boundary_distance() -> None:
+    boundary = _observation(1, split=DataSplit.TEST, boundary=True)
+    ineligible = replace(_observation(2, split=DataSplit.TEST), monolingual_control_eligible=False)
+    too_close = replace(_observation(3, split=DataSplit.TEST), nearest_boundary_distance_tokens=3)
+
+    result = match_boundary_controls(
+        (boundary, ineligible, too_close), boundary_exclusion_radius_tokens=3
+    )
+
+    assert result.pairs == ()
+    assert result.unmatched_boundary_ids == (boundary.example_id,)
+    with pytest.raises(ValueError, match="cannot be negative"):
+        match_boundary_controls((boundary, ineligible), boundary_exclusion_radius_tokens=-1)
 
 
 def test_matched_pair_contract_rejects_non_exact_control() -> None:
@@ -273,6 +309,9 @@ def test_matched_pair_contract_rejects_non_exact_control() -> None:
 
     with pytest.raises(ValueError, match="control stratum"):
         MatchedBoundaryPair(boundary, control)
+
+    with pytest.raises(ValueError, match="eligible monolingual"):
+        MatchedBoundaryPair(boundary, replace(boundary, target_is_boundary=False))
 
 
 def test_predict_many_preserves_order_and_metric_targets() -> None:

@@ -44,6 +44,8 @@ class_balancing = true
 l2 = 0.01
 learning_rate = 0.08
 iterations = 500
+speaker_grouped_oof_folds = 5
+boundary_training_source = "speaker_grouped_out_of_fold"
 
 [calibration]
 method = "temperature_scaling"
@@ -54,6 +56,8 @@ forbid_test_fit = true
 
 [matched_controls]
 exact_fields = ["language", "is_entity", "acoustic_band", "token_length_band"]
+require_monolingual_control_eligible = true
+boundary_exclusion_radius_tokens = 3
 prefer_same_speaker = true
 reuse_controls = false
 report_unmatched = true

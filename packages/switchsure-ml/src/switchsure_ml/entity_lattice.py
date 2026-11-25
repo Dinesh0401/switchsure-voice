@@ -42,6 +42,7 @@ class EvidenceOrigin(StrEnum):
 
 class EdgeRelation(StrEnum):
     COMPETING_VALUE = "competing_value"
+    COMPETING_ENTITY_TYPE = "competing_entity_type"
     COEXISTING_ENTITY = "coexisting_entity"
 
 
@@ -52,6 +53,8 @@ class EntityRoute(StrEnum):
 
 class ReviewReason(StrEnum):
     COMPETING_VALUES = "competing_values"
+    COMPETING_ENTITY_TYPES = "competing_entity_types"
+    MISSING_ENTITY_ALTERNATIVE = "missing_entity_alternative"
     NO_POSITIVE_SUPPORT = "no_positive_support"
     INVALID_CANONICAL_VALUE = "invalid_canonical_value"
     MISSING_PINNED_PROVENANCE = "missing_pinned_provenance"
@@ -76,6 +79,9 @@ _NUMBER = re.compile(r"^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$")
 _MONEY_JOINED = re.compile(r"^(₹|\$|€|£)\s?([+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+))$")
 _IDENTIFIER = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9-]{6,}$")
 _BOUNDARY_PUNCTUATION = " \t\r\n,;!?()[]{}\"'"
+_IMMUTABLE_MODEL_REVISION = re.compile(
+    r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64}|sha256:[0-9a-fA-F]{64})$"
+)
 
 _DOSAGE_UNITS = {
     "mg": "mg",
@@ -145,7 +151,9 @@ class HypothesisProvenance:
 
     @property
     def is_pinned(self) -> bool:
-        return self.model_revision is not None
+        return self.model_revision is not None and bool(
+            _IMMUTABLE_MODEL_REVISION.fullmatch(self.model_revision.strip())
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +173,11 @@ class EntityHypothesis:
             raise ValueError("hypothesis must contain words")
         if [word.index for word in self.words] != list(range(len(self.words))):
             raise ValueError("word indexes must be contiguous and start at zero")
+        if any(
+            current.start_ms < previous.start_ms or current.end_ms < previous.end_ms
+            for previous, current in zip(self.words, self.words[1:], strict=False)
+        ):
+            raise ValueError("word timestamps must be monotonic")
         _validate_finite_non_negative("relative_weight", self.relative_weight)
 
 
@@ -537,9 +550,13 @@ class EntityDecision:
     def __post_init__(self) -> None:
         if not self.decision_id.strip() or not self.candidate_ids:
             raise ValueError("decision requires an id and candidate ids")
+        if len(self.candidate_ids) != len(set(self.candidate_ids)):
+            raise ValueError("decision candidate ids must be unique")
         if self.route is EntityRoute.PRESERVE_SURFACE:
             if self.selected_candidate_id is None or self.reason_codes:
                 raise ValueError("preserve decision requires one selection and no review reason")
+            if self.selected_candidate_id not in self.candidate_ids:
+                raise ValueError("selected candidate must be exposed in candidate ids")
         elif self.selected_candidate_id is not None or not self.reason_codes:
             raise ValueError("review decision must expose alternatives and reason codes")
 
@@ -591,6 +608,17 @@ def _cluster_mentions(mentions: Sequence[EntityMention]) -> tuple[tuple[EntityMe
     return tuple(tuple(cluster) for cluster in clusters)
 
 
+def _hypothesis_covers_interval(hypothesis: EntityHypothesis, start_ms: int, end_ms: int) -> bool:
+    """Return whether an alternative supplies evidence over an entity interval.
+
+    N-best alternatives normally span the same utterance. An alternative that
+    covers an interval but emits no matching entity is deletion evidence and
+    must not be silently ignored by the entity policy.
+    """
+
+    return hypothesis.words[0].start_ms <= start_ms and hypothesis.words[-1].end_ms >= end_ms
+
+
 def build_entity_lattice(
     hypotheses: Iterable[EntityHypothesis],
     *,
@@ -620,6 +648,8 @@ def build_entity_lattice(
     decisions: list[EntityDecision] = []
 
     for cluster in _cluster_mentions(mentions):
+        cluster_start_ms = min(item.start_ms for item in cluster)
+        cluster_end_ms = max(item.end_ms for item in cluster)
         by_value: dict[tuple[EntityKind, str], list[EntityMention]] = defaultdict(list)
         for mention in cluster:
             key_value = mention.canonical.canonical_value
@@ -643,8 +673,8 @@ def build_entity_lattice(
                 candidate_id=_stable_id(
                     "candidate",
                     kind,
-                    min(item.start_ms for item in cluster),
-                    max(item.end_ms for item in cluster),
+                    cluster_start_ms,
+                    cluster_end_ms,
                     key_value,
                 ),
                 entity_kind=kind,
@@ -689,9 +719,17 @@ def build_entity_lattice(
         )
         invalid = any(candidate.canonical_value is None for candidate in cluster_candidates)
         unpinned = any(not mention.provenance.is_pinned for mention in cluster)
+        mentioning_hypotheses = {mention.hypothesis_id for mention in cluster}
+        missing_entity_alternative = any(
+            item.hypothesis_id not in mentioning_hypotheses
+            and _hypothesis_covers_interval(item, cluster_start_ms, cluster_end_ms)
+            for item in items
+        )
         reasons: list[ReviewReason] = []
         if len(cluster_candidates) > 1:
             reasons.append(ReviewReason.COMPETING_VALUES)
+        if missing_entity_alternative:
+            reasons.append(ReviewReason.MISSING_ENTITY_ALTERNATIVE)
         if total_support <= 0.0:
             reasons.append(ReviewReason.NO_POSITIVE_SUPPORT)
         if invalid:
@@ -704,18 +742,71 @@ def build_entity_lattice(
                 decision_id=_stable_id(
                     "decision",
                     cluster[0].entity_kind,
-                    min(item.start_ms for item in cluster),
-                    max(item.end_ms for item in cluster),
+                    cluster_start_ms,
+                    cluster_end_ms,
                 ),
                 entity_kind=cluster[0].entity_kind,
-                start_ms=min(item.start_ms for item in cluster),
-                end_ms=max(item.end_ms for item in cluster),
+                start_ms=cluster_start_ms,
+                end_ms=cluster_end_ms,
                 route=route,
                 selected_candidate_id=ordered[0] if route is EntityRoute.PRESERVE_SURFACE else None,
                 candidate_ids=ordered,
                 reason_codes=tuple(reasons),
             )
         )
+
+    # A time-aligned alternative can interpret the same acoustic region as a
+    # different critical type (for example, a phone number versus an account
+    # identifier). Treat that as competition, not two independently safe
+    # entities. Cross-type coexistence needs an explicit downstream semantic
+    # model and cannot be inferred from decoder output alone.
+    cross_type_decisions: set[str] = set()
+    candidates_by_id = {candidate.candidate_id: candidate for candidate in all_candidates}
+    for left_decision, right_decision in combinations(decisions, 2):
+        if left_decision.entity_kind is right_decision.entity_kind:
+            continue
+        temporal = _interval_iou(
+            (left_decision.start_ms, left_decision.end_ms),
+            (right_decision.start_ms, right_decision.end_ms),
+        )
+        if temporal < 0.5:
+            continue
+        cross_type_decisions.update((left_decision.decision_id, right_decision.decision_id))
+        for left_id in left_decision.candidate_ids:
+            for right_id in right_decision.candidate_ids:
+                left_candidate = candidates_by_id[left_id]
+                right_candidate = candidates_by_id[right_id]
+                similarity = _surface_similarity(
+                    left_candidate.representative_surface,
+                    right_candidate.representative_surface,
+                )
+                all_edges.append(
+                    LatticeEdge(
+                        source_candidate_id=left_id,
+                        target_candidate_id=right_id,
+                        relation=EdgeRelation.COMPETING_ENTITY_TYPE,
+                        temporal_iou=temporal,
+                        surface_similarity=similarity,
+                        compatibility_weight=(temporal + similarity) / 2.0,
+                    )
+                )
+
+    decisions = [
+        EntityDecision(
+            decision_id=decision.decision_id,
+            entity_kind=decision.entity_kind,
+            start_ms=decision.start_ms,
+            end_ms=decision.end_ms,
+            route=EntityRoute.REVIEW,
+            selected_candidate_id=None,
+            candidate_ids=decision.candidate_ids,
+            reason_codes=(*decision.reason_codes, ReviewReason.COMPETING_ENTITY_TYPES),
+        )
+        if decision.decision_id in cross_type_decisions
+        and ReviewReason.COMPETING_ENTITY_TYPES not in decision.reason_codes
+        else decision
+        for decision in decisions
+    ]
 
     return EntityLattice(
         candidates=tuple(all_candidates),

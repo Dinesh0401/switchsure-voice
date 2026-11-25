@@ -39,6 +39,10 @@ but it must reproduce the split and calibration safeguards.
 ## Leakage and calibration controls
 
 - Both heads fit only on examples explicitly marked `train`.
+- The error head receives boundary scores produced by deterministic,
+  speaker-grouped out-of-fold boundary heads. No row or speaker is scored by a
+  boundary head that fitted that speaker; the final all-train boundary head is
+  used only after error-head fitting.
 - Temperature scaling fits once, only on the speaker- and session-disjoint
   `calibration` split.
 - Validation selects hyperparameters and action thresholds; it never fits the
@@ -55,8 +59,11 @@ declared boundary-calibration study is run.
 
 ## Matched boundary controls
 
-Gold boundary tokens are matched to unused non-boundary tokens within one split
-on language, entity status, acoustic-quality band, and token-length band.
+Gold boundary tokens are matched to unused, explicitly eligible monolingual
+control tokens within one split on language, entity status, acoustic-quality
+band, and token-length band. Candidates at or within the configured three-token
+gold-boundary exclusion radius are rejected. Missing eligibility/distance
+metadata cannot produce a control match.
 Same-speaker controls are preferred, then closest token length. Unmatched
 boundaries are reported rather than dropped silently. Gold boundary labels are
 used only for this offline analysis and never enter inference features.

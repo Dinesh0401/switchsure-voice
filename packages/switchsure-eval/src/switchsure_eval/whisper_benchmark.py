@@ -25,6 +25,12 @@ from typing import Final
 
 from switchsure_ml.asr_adapters import AsrAdapterError
 from switchsure_ml.asr_contracts import AsrEvidencePort, AsrOptions, AsrRequest, AudioSource
+from switchsure_ml.data_governance import (
+    DatasetApproval,
+    DatasetUse,
+    DatasetUseNotApproved,
+    require_approved_dataset,
+)
 from switchsure_ml.dataset_manifest import (
     DataRecord,
     DatasetManifest,
@@ -320,6 +326,7 @@ def preflight(
     manifest: DatasetManifest,
     config: BenchmarkConfig,
     data_root: Path,
+    approvals: tuple[DatasetApproval, ...] = (),
 ) -> tuple[PreflightIssue, ...]:
     """Return every blocker; an experiment may run only when this tuple is empty."""
 
@@ -344,6 +351,30 @@ def preflight(
         issues.append(PreflightIssue("empty_split", "selected split has no records"))
 
     if config.backend is BenchmarkBackend.FASTER_WHISPER:
+        sources = {source.dataset_id: source for source in manifest.sources}
+        selected_source_ids = sorted({record.dataset_id for record in selected})
+        required_uses = [DatasetUse.CODE_SWITCH_EVALUATION]
+        if config.split is DataSplit.TEST:
+            required_uses.append(DatasetUse.LOCKED_TEST)
+        for dataset_id in selected_source_ids:
+            source = sources.get(dataset_id)
+            if source is None:
+                continue
+            for intended_use in required_uses:
+                try:
+                    require_approved_dataset(
+                        approvals,
+                        dataset_id=source.dataset_id,
+                        version=source.version,
+                        intended_use=intended_use,
+                    )
+                except DatasetUseNotApproved:
+                    issues.append(
+                        PreflightIssue(
+                            "dataset_use_not_approved",
+                            f"an exact dataset version is not approved for {intended_use.value}",
+                        )
+                    )
         if importlib.util.find_spec("faster_whisper") is None:
             issues.append(
                 PreflightIssue(
@@ -364,8 +395,19 @@ def preflight(
                 PreflightIssue("model_snapshot_missing", "local model snapshot is unavailable")
             )
         elif config.model_revision.startswith(_SHA256_PREFIX):
-            observed = hash_directory(snapshot)
-            if observed != config.model_revision.removeprefix(_SHA256_PREFIX):
+            observed: str | None = None
+            try:
+                observed = hash_directory(snapshot)
+            except (OSError, ValueError):
+                issues.append(
+                    PreflightIssue(
+                        "model_snapshot_unreadable",
+                        "local model snapshot is empty or unreadable",
+                    )
+                )
+            if observed is not None and observed != config.model_revision.removeprefix(
+                _SHA256_PREFIX
+            ):
                 issues.append(
                     PreflightIssue(
                         "model_hash_mismatch",
@@ -500,11 +542,12 @@ def run_benchmark(
     data_root: Path,
     adapter: AsrEvidencePort,
     *,
+    approvals: tuple[DatasetApproval, ...] = (),
     monotonic: Callable[[], float] = time.perf_counter,
 ) -> BenchmarkArtifact:
     """Run a validated split and return a content-redacted research artifact."""
 
-    issues = preflight(manifest, config, data_root)
+    issues = preflight(manifest, config, data_root, approvals)
     if issues:
         return blocked_artifact(manifest, config, issues)
 

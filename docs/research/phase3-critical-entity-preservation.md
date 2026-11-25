@@ -28,11 +28,15 @@ No locked-test result has been produced yet.
    decoder scores are uncalibrated evidence—not probabilities of correctness.
 4. Different overlapping critical values are all returned to review. A larger
    decoder weight cannot silently discard or rewrite an alternative.
-5. Invalid locale-dependent values and values from an unpinned model revision
-   are routed to review.
-6. Entity and transcript text is excluded from object representations to reduce
+5. Entity deletion evidence and competing entity-type interpretations in
+   time-aligned alternatives are routed to review.
+6. Invalid locale-dependent values and values from an unpinned model revision
+   are routed to review. Only a full 40/64-character commit or content hash, or
+   an explicit `sha256:<64-hex>` digest, is accepted; branch names, tags, and
+   other mutable aliases are never treated as pinned provenance.
+7. Entity and transcript text is excluded from object representations to reduce
    accidental logging. Application logs must use opaque IDs and reason codes.
-7. No generative model participates in structured canonicalization or ambiguity
+8. No generative model participates in structured canonicalization or ambiguity
    resolution.
 
 ## Implemented baseline
@@ -44,6 +48,8 @@ No locked-test result has been produced yet.
 - locale-explicit typed canonicalization, including Tamil digit and unit mapping;
 - immutable ASR-hypothesis and pinned provenance contracts;
 - time-overlap clustering across N-best or repeated-decoding hypotheses;
+- deletion-aware review when an aligned alternative omits the entity;
+- cross-type competition when alternatives disagree on the critical type;
 - evidence aggregation by canonical value without presenting support as confidence;
 - weighted competing-value edges using temporal overlap and surface similarity;
 - conservative preserve/review decisions that expose every competing value.

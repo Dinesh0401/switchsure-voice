@@ -41,6 +41,8 @@ class BoundaryObservation:
     acoustic_band: str
     token_length: int
     is_entity: bool
+    monolingual_control_eligible: bool
+    nearest_boundary_distance_tokens: int
     decoder_error_evidence: float
     lid_entropy: float
     language_transition_evidence: float
@@ -67,6 +69,10 @@ class BoundaryObservation:
             raise ValueError("token_index cannot be negative")
         if self.token_length < 1:
             raise ValueError("token_length must be at least one")
+        if not isinstance(self.monolingual_control_eligible, bool):
+            raise ValueError("monolingual_control_eligible must be explicitly boolean")
+        if self.nearest_boundary_distance_tokens < 0:
+            raise ValueError("nearest_boundary_distance_tokens cannot be negative")
         bounded = {
             "decoder_error_evidence": self.decoder_error_evidence,
             "lid_entropy": self.lid_entropy,
@@ -103,6 +109,8 @@ class MatchedBoundaryPair:
             raise ValueError("boundary member must have a positive gold boundary label")
         if self.control.target_is_boundary is not False:
             raise ValueError("control member must have a negative gold boundary label")
+        if not self.control.monolingual_control_eligible:
+            raise ValueError("control member must be an eligible monolingual control")
         if self.boundary.split is not self.control.split:
             raise ValueError("matched observations cannot cross dataset splits")
         if self.boundary.control_stratum != self.control.control_stratum:
@@ -121,6 +129,8 @@ class ControlMatchResult:
 
 def match_boundary_controls(
     observations: Sequence[BoundaryObservation],
+    *,
+    boundary_exclusion_radius_tokens: int,
 ) -> ControlMatchResult:
     """Greedily match gold boundaries to unused exact-stratum controls.
 
@@ -132,6 +142,8 @@ def match_boundary_controls(
 
     if not observations:
         raise ValueError("observations cannot be empty")
+    if boundary_exclusion_radius_tokens < 0:
+        raise ValueError("boundary_exclusion_radius_tokens cannot be negative")
     splits = {observation.split for observation in observations}
     if len(splits) != 1:
         raise ValueError("matched-control analysis must not cross dataset splits")
@@ -147,6 +159,8 @@ def match_boundary_controls(
         observation.example_id: observation
         for observation in observations
         if observation.target_is_boundary is False
+        and observation.monolingual_control_eligible
+        and observation.nearest_boundary_distance_tokens > boundary_exclusion_radius_tokens
     }
     pairs: list[MatchedBoundaryPair] = []
     unmatched: list[str] = []
@@ -312,12 +326,14 @@ class BoundaryAwareUncertaintyModel:
         error_head: _LogisticHead,
         training_speakers: frozenset[str],
         training_sessions: frozenset[str],
+        boundary_oof_folds: int | None,
     ) -> None:
         self.feature_mode = feature_mode
         self._boundary_head = boundary_head
         self._error_head = error_head
         self._training_speakers = training_speakers
         self._training_sessions = training_sessions
+        self._boundary_oof_folds = boundary_oof_folds
         self._calibrator: _TemperatureCalibrator | None = None
 
     @classmethod
@@ -329,6 +345,7 @@ class BoundaryAwareUncertaintyModel:
         learning_rate: float = 0.08,
         iterations: int = 500,
         l2: float = 0.01,
+        boundary_oof_folds: int = 5,
     ) -> BoundaryAwareUncertaintyModel:
         """Fit both heads using only explicitly labelled training examples."""
 
@@ -345,10 +362,30 @@ class BoundaryAwareUncertaintyModel:
             iterations=iterations,
             l2=l2,
         )
-        error_rows = [
-            _error_features(observation, feature_mode, boundary_head)
-            for observation in observations
-        ]
+        if feature_mode is BoundaryFeatureMode.BOUNDARY_AWARE:
+            boundary_scores = _speaker_grouped_oof_boundary_scores(
+                observations,
+                folds=boundary_oof_folds,
+                learning_rate=learning_rate,
+                iterations=iterations,
+                l2=l2,
+            )
+            error_rows = [
+                _error_features(
+                    observation,
+                    feature_mode,
+                    boundary_head,
+                    boundary_probability=boundary_scores[observation.example_id],
+                )
+                for observation in observations
+            ]
+            fitted_oof_folds: int | None = boundary_oof_folds
+        else:
+            error_rows = [
+                _error_features(observation, feature_mode, boundary_head)
+                for observation in observations
+            ]
+            fitted_oof_folds = None
         error_labels = [bool(observation.target_is_error) for observation in observations]
         error_head = _LogisticHead.fit(
             error_rows,
@@ -363,6 +400,7 @@ class BoundaryAwareUncertaintyModel:
             error_head=error_head,
             training_speakers=frozenset(observation.speaker_id for observation in observations),
             training_sessions=frozenset(observation.session_id for observation in observations),
+            boundary_oof_folds=fitted_oof_folds,
         )
 
     @property
@@ -372,6 +410,12 @@ class BoundaryAwareUncertaintyModel:
     @property
     def calibration_temperature(self) -> float | None:
         return self._calibrator.temperature if self._calibrator is not None else None
+
+    @property
+    def boundary_oof_folds(self) -> int | None:
+        """Speaker-grouped folds used for boundary features in error-head fitting."""
+
+        return self._boundary_oof_folds
 
     def calibrate(self, observations: Sequence[BoundaryObservation]) -> None:
         """Fit temperature once on speaker/session-disjoint calibration data."""
@@ -436,6 +480,8 @@ def _error_features(
     observation: BoundaryObservation,
     feature_mode: BoundaryFeatureMode,
     boundary_head: _LogisticHead,
+    *,
+    boundary_probability: float | None = None,
 ) -> tuple[float, ...]:
     base = (
         observation.decoder_error_evidence,
@@ -446,8 +492,58 @@ def _error_features(
     )
     if feature_mode is BoundaryFeatureMode.BASELINE:
         return base
-    boundary_probability = _sigmoid(boundary_head.logit(_boundary_features(observation)))
+    if boundary_probability is None:
+        boundary_probability = _sigmoid(boundary_head.logit(_boundary_features(observation)))
     return (*base, boundary_probability, _binary_entropy(boundary_probability))
+
+
+def _speaker_grouped_oof_boundary_scores(
+    observations: Sequence[BoundaryObservation],
+    *,
+    folds: int,
+    learning_rate: float,
+    iterations: int,
+    l2: float,
+) -> dict[str, float]:
+    """Return boundary probabilities from models that never saw the row's speaker."""
+
+    speakers = sorted({observation.speaker_id for observation in observations})
+    if folds < 2:
+        raise ValueError("boundary_oof_folds must be at least two")
+    if len(speakers) < folds:
+        raise ValueError("boundary_oof_folds cannot exceed the number of training speakers")
+    speaker_fold = {speaker: index % folds for index, speaker in enumerate(speakers)}
+    scores: dict[str, float] = {}
+    for fold in range(folds):
+        fit_examples = [
+            observation
+            for observation in observations
+            if speaker_fold[observation.speaker_id] != fold
+        ]
+        held_out = [
+            observation
+            for observation in observations
+            if speaker_fold[observation.speaker_id] == fold
+        ]
+        if not held_out:
+            raise ValueError("each boundary OOF fold must contain at least one speaker")
+        labels = [bool(observation.target_is_boundary) for observation in fit_examples]
+        if len(set(labels)) != 2:
+            raise ValueError(
+                "each speaker-grouped boundary OOF training fold requires both boundary classes"
+            )
+        head = _LogisticHead.fit(
+            [_boundary_features(observation) for observation in fit_examples],
+            labels,
+            learning_rate=learning_rate,
+            iterations=iterations,
+            l2=l2,
+        )
+        for observation in held_out:
+            scores[observation.example_id] = _sigmoid(head.logit(_boundary_features(observation)))
+    if len(scores) != len(observations):
+        raise RuntimeError("boundary OOF scoring did not cover every training example")
+    return scores
 
 
 def _validate_fit_examples(

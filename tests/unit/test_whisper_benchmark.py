@@ -152,6 +152,7 @@ def test_preflight_fails_closed_for_unapproved_real_execution(tmp_path: Path) ->
 
     assert "model_revision_unpinned" in codes
     assert "backend_missing" in codes
+    assert "dataset_use_not_approved" in codes
     assert "immutable_model_snapshot_required" in codes
     assert "missing_audio" in codes
     assert "missing_reference" in codes
@@ -254,6 +255,25 @@ def _write_cli_inputs(root: Path, *, adapter: str = "faster-whisper") -> tuple[P
         ),
         encoding="utf-8",
     )
+    approval_folder = root / "configs" / "data"
+    approval_folder.mkdir(parents=True)
+    (approval_folder / "dataset-approvals.toml").write_text(
+        "\n".join(
+            (
+                'schema_version = "1.0"',
+                'reviewed_on = "2026-11-23"',
+                "[[dataset]]",
+                'id = "approved-source"',
+                'version = "immutable-v1"',
+                'decision = "approved"',
+                'permitted_uses = ["code_switch_evaluation"]',
+                "conditions = []",
+                'evidence = ["registry://approval-evidence"]',
+                'rationale = "Approved for this exact evaluation role."',
+            )
+        ),
+        encoding="utf-8",
+    )
     return config_path, manifest_path
 
 
@@ -272,6 +292,8 @@ def test_cli_writes_a_redacted_blocked_artifact(
             str(config_path),
             "--manifest",
             str(manifest_path),
+            "--approvals",
+            str(tmp_path / "configs" / "data" / "dataset-approvals.toml"),
             "--data-root",
             str(tmp_path / "approved-data"),
             "--output",
@@ -303,6 +325,10 @@ def test_cli_loads_exact_manifest_and_rejects_wrong_adapter(tmp_path: Path) -> N
     manifest = benchmark_cli._load_manifest(manifest_path)
     assert manifest.manifest_id == "cli-manifest"
     assert manifest.records[0].metadata == (("noise_band", "quiet"),)
+    approvals = benchmark_cli._load_approvals(
+        tmp_path / "configs" / "data" / "dataset-approvals.toml"
+    )
+    assert approvals[0].dataset_id == "approved-source"
     with pytest.raises(ValueError, match="only faster-whisper"):
         benchmark_cli._build_config(
             config_path,
@@ -335,6 +361,15 @@ def test_model_snapshot_hash_and_accelerator_probe_are_deterministic(
     snapshot.mkdir()
     with pytest.raises(ValueError, match="no files"):
         benchmark.hash_directory(snapshot)
+    empty_snapshot_config = replace(
+        _config(backend=BenchmarkBackend.FASTER_WHISPER),
+        model_revision="sha256:" + "0" * 64,
+        local_model_snapshot=snapshot.resolve(),
+    )
+    empty_snapshot_codes = {
+        issue.code for issue in preflight(_manifest("0" * 64), empty_snapshot_config, tmp_path)
+    }
+    assert "model_snapshot_unreadable" in empty_snapshot_codes
     (snapshot / "model.bin").write_bytes(b"weights")
     first = benchmark.hash_directory(snapshot)
     assert len(first) == 64
