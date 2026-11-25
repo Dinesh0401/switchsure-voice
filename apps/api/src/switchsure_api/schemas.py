@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from switchsure_core import (
@@ -214,3 +215,22 @@ class TranscriptAssessmentOut(StrictModel):
 class HealthOut(StrictModel):
     status: str
     service: str
+
+
+class JobStatusOut(StrictModel):
+    job_id: str
+    state: Literal["queued", "running", "succeeded", "failed", "cancelled"]
+    created_at: datetime
+    updated_at: datetime
+    expires_at: datetime
+    attempts: int
+    max_attempts: int
+    retention_class: Literal["ephemeral"]
+    error_code: str | None
+    result: TranscriptAssessmentOut | None = None
+
+
+class ApiErrorOut(StrictModel):
+    code: str
+    message: str
+    request_id: str

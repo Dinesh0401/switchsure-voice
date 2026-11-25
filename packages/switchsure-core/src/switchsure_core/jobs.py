@@ -407,6 +407,16 @@ class PilotJobQueue[PayloadT, ResultT]:
         with self._lock:
             return self._purge_expired_locked(self._now())
 
+    def healthcheck(self) -> bool:
+        """Probe metadata storage without exposing job or content fields."""
+
+        with self._lock:
+            try:
+                row = self._connection.execute("SELECT 1 AS healthy").fetchone()
+            except sqlite3.Error:
+                return False
+            return row is not None and int(row["healthy"]) == 1
+
     def _active_count_locked(self) -> int:
         row = self._connection.execute(
             "SELECT COUNT(*) AS count FROM pilot_jobs WHERE state IN (?, ?)",
