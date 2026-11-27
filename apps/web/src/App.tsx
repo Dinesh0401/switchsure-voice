@@ -1,10 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { analyzeEvidence } from "./lib/api";
 import { SAMPLE_EVIDENCE } from "./lib/sample";
+import { useEvidenceJob } from "./lib/useEvidenceJob";
 import type { EntityAssessment, TranscriptAssessment, WordAssessment } from "./types";
-
-type RequestState = "idle" | "loading" | "success" | "error";
 
 const ENTITY_LABELS: Record<string, string> = {
   dosage: "dosage",
@@ -73,34 +71,47 @@ function actionCopy(result: TranscriptAssessment): { eyebrow: string; heading: s
 }
 
 export function App() {
-  const [requestState, setRequestState] = useState<RequestState>("idle");
-  const [result, setResult] = useState<TranscriptAssessment | null>(null);
-  const [error, setError] = useState("");
+  const reviewJob = useEvidenceJob(SAMPLE_EVIDENCE);
+  const result = reviewJob.result;
   const [entityDrafts, setEntityDrafts] = useState<Record<number, string>>({});
   const [confirmedEntities, setConfirmedEntities] = useState<Set<number>>(new Set());
   const [transcriptDraft, setTranscriptDraft] = useState("");
   const [finalized, setFinalized] = useState(false);
+  const [typedReady, setTypedReady] = useState(false);
 
   const action = useMemo(() => (result ? actionCopy(result) : null), [result]);
 
-  async function runReview() {
-    setRequestState("loading");
-    setError("");
+  useEffect(() => {
+    if (!result) return;
+    setTranscriptDraft(result.text);
+    setEntityDrafts(
+      Object.fromEntries(result.entities.map((entity, index) => [index, entity.surface])),
+    );
+    setConfirmedEntities(new Set());
     setFinalized(false);
-    try {
-      const next = await analyzeEvidence(SAMPLE_EVIDENCE);
-      setResult(next);
-      setTranscriptDraft(next.text);
-      setEntityDrafts(
-        Object.fromEntries(next.entities.map((entity, index) => [index, entity.surface])),
-      );
-      setConfirmedEntities(new Set());
-      setRequestState("success");
-    } catch (cause) {
-      setRequestState("error");
-      setError(cause instanceof Error ? cause.message : "The review could not be completed.");
-    }
+    setTypedReady(false);
+  }, [result]);
+
+  async function runReview() {
+    setFinalized(false);
+    setTypedReady(false);
+    await reviewJob.submit();
   }
+
+  const jobIsActive =
+    reviewJob.state === "submitting" ||
+    reviewJob.state === "queued" ||
+    reviewJob.state === "running";
+
+  const jobAnnouncement = {
+    idle: "",
+    submitting: "Sending the sample for a private temporary review.",
+    queued: "The sample is queued and waiting to be checked.",
+    running: "The sample is being checked.",
+    succeeded: action?.heading ?? "The sample check is complete.",
+    failed: reviewJob.error,
+    cancelled: "The sample check was cancelled.",
+  }[reviewJob.state];
 
   function updateEntity(index: number, value: string) {
     setEntityDrafts((current) => ({ ...current, [index]: value }));
@@ -160,9 +171,9 @@ export function App() {
                 className="primary-button"
                 type="button"
                 onClick={runReview}
-                disabled={requestState === "loading"}
+                disabled={jobIsActive}
               >
-                {requestState === "loading" ? "Checking sample…" : "Check Tamil–English sample"}
+                {jobIsActive ? "Checking sample…" : "Check Tamil–English sample"}
               </button>
               <a className="text-link" href="#how-it-works">
                 See what is checked <span aria-hidden="true">↓</span>
@@ -195,26 +206,95 @@ export function App() {
         </section>
 
         <div className="live-region" aria-live="polite" aria-atomic="true">
-          {requestState === "loading" && "Checking the sample transcript."}
-          {requestState === "success" && action?.heading}
-          {requestState === "error" && error}
+          {jobAnnouncement}
           {finalized && "Transcript marked as reviewed."}
+          {typedReady && "Typed transcript is ready for your review."}
         </div>
 
-        {requestState === "error" && (
+        {jobIsActive && (
+          <section className="job-panel" aria-labelledby="job-heading" aria-busy="true">
+            <div>
+              <p className="card-kicker">Temporary private job</p>
+              <h2 id="job-heading">
+                {reviewJob.state === "queued"
+                  ? "Waiting for an available checker"
+                  : reviewJob.state === "running"
+                    ? "Checking the sample"
+                    : "Sending the sample"}
+              </h2>
+              <p>
+                {reviewJob.state === "queued"
+                  ? "Your place is saved. You can cancel without losing anything stored on this page."
+                  : "The evidence is kept only for this temporary review."}
+              </p>
+            </div>
+            {reviewJob.canCancel && (
+              <button className="secondary-button" type="button" onClick={reviewJob.cancel}>
+                Cancel check
+              </button>
+            )}
+          </section>
+        )}
+
+        {reviewJob.state === "failed" && (
           <section className="error-panel" role="alert" aria-labelledby="error-heading">
             <div>
-              <p className="card-kicker">Connection problem</p>
+              <p className="card-kicker">Check stopped</p>
               <h2 id="error-heading">We could not check the sample</h2>
-              <p>{error}</p>
+              <p>{reviewJob.error}</p>
+              <a className="text-link" href="#typed-fallback">Type the transcript instead</a>
+            </div>
+            {reviewJob.retryable && (
+              <button className="secondary-button" type="button" onClick={reviewJob.retry}>
+                Try again
+              </button>
+            )}
+          </section>
+        )}
+
+        {reviewJob.state === "cancelled" && (
+          <section className="job-panel" aria-labelledby="cancelled-heading">
+            <div>
+              <p className="card-kicker">Cancelled</p>
+              <h2 id="cancelled-heading">The sample check was cancelled</h2>
+              <p>No result was created. You can start again or continue by typing.</p>
             </div>
             <button className="secondary-button" type="button" onClick={runReview}>
-              Try again
+              Start again
             </button>
           </section>
         )}
 
-        {result && requestState === "success" && action && (
+        {reviewJob.state !== "succeeded" && (
+          <section className="typed-entry" id="typed-fallback" aria-labelledby="typed-title">
+            <p className="card-kicker">Speech-free path</p>
+            <h2 id="typed-title">Type the transcript instead</h2>
+            <p id="typed-entry-help">
+              This stays in this page only. It is not sent automatically.
+            </p>
+            <textarea
+              id="typed-entry-text"
+              aria-label="Typed transcript"
+              aria-describedby="typed-entry-help"
+              rows={4}
+              value={transcriptDraft}
+              onChange={(event) => {
+                setTranscriptDraft(event.target.value);
+                setTypedReady(false);
+              }}
+            />
+            <button
+              className="primary-button"
+              type="button"
+              disabled={!transcriptDraft.trim() || typedReady}
+              onClick={() => setTypedReady(true)}
+            >
+              {typedReady ? "Typed transcript ready" : "Use typed transcript"}
+            </button>
+          </section>
+        )}
+
+        {result && reviewJob.state === "succeeded" && action && (
           <section className="review-workspace" aria-labelledby="review-title">
             <div className={`decision-banner decision-${result.action}`}>
               <div className="decision-icon" aria-hidden="true">

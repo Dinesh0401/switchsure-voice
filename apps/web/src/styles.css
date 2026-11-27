@@ -83,7 +83,9 @@ textarea:focus-visible {
 .review-workspace,
 .how-it-works,
 .site-footer,
-.error-panel {
+.error-panel,
+.job-panel,
+.typed-entry {
   width: min(1180px, calc(100% - 2rem));
   margin-inline: auto;
 }
@@ -332,6 +334,47 @@ button:disabled {
   background: var(--rose-pale);
   border: 1px solid #e5aeb0;
   border-radius: 1rem;
+}
+
+.job-panel,
+.typed-entry {
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.job-panel {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.job-panel h2,
+.job-panel p,
+.typed-entry h2,
+.typed-entry p {
+  margin-block: 0.25rem;
+}
+
+.job-panel p:last-child,
+.typed-entry > p {
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.typed-entry {
+  margin-bottom: 4rem;
+}
+
+.typed-entry textarea {
+  margin-block: 1rem;
+}
+
+.typed-entry .primary-button {
+  display: block;
 }
 
 .error-panel h2,
@@ -795,7 +838,9 @@ textarea {
   .review-workspace,
   .how-it-works,
   .site-footer,
-  .error-panel {
+  .error-panel,
+  .job-panel,
+  .typed-entry {
     width: min(100% - 1rem, 1180px);
   }
 
@@ -815,6 +860,7 @@ textarea {
   .panel-heading,
   .review-footer,
   .error-panel,
+  .job-panel,
   .site-footer {
     align-items: stretch;
     flex-direction: column;
@@ -825,7 +871,8 @@ textarea {
   }
 
   .review-footer,
-  .error-panel {
+  .error-panel,
+  .job-panel {
     display: flex;
   }
 

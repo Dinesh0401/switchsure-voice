@@ -50,3 +50,24 @@ export interface EvidenceRequest {
     languages: LanguageProbability[];
   }>;
 }
+
+export type JobState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface EvidenceJobStatus {
+  job_id: string;
+  state: JobState;
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+  attempts: number;
+  max_attempts: number;
+  retention_class: "ephemeral";
+  error_code: string | null;
+  result: TranscriptAssessment | null;
+}
+
+export interface ApiErrorResponse {
+  code: string;
+  message: string;
+  request_id: string;
+}
