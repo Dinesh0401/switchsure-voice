@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from contextlib import suppress
 from datetime import timedelta
 from threading import BoundedSemaphore
+from time import perf_counter
 from uuid import uuid4
 
 from switchsure_core import (
@@ -18,6 +19,17 @@ from switchsure_core import (
 )
 
 from .schemas import AnalyzeEvidenceRequest, TranscriptAssessmentOut
+from .telemetry import (
+    BoundedMetricRegistry,
+    ContentFreeEvent,
+    PipelineStage,
+    SafeErrorClass,
+    TelemetryEventKind,
+    TelemetrySnapshot,
+)
+from .telemetry import (
+    DecisionAction as TelemetryDecisionAction,
+)
 
 EvidenceProcessor = Callable[[AnalyzeEvidenceRequest], TranscriptAssessmentOut]
 
@@ -39,6 +51,7 @@ class EvidenceJobService:
         processor: EvidenceProcessor = analyze_evidence_request,
         worker_concurrency: int = 1,
         processing_timeout: timedelta = timedelta(seconds=30),
+        telemetry: BoundedMetricRegistry | None = None,
     ) -> None:
         if worker_concurrency < 1:
             raise ValueError("worker_concurrency must be positive")
@@ -48,6 +61,7 @@ class EvidenceJobService:
         self._processor = processor
         self._processing_timeout = processing_timeout
         self._worker_slots = BoundedSemaphore(worker_concurrency)
+        self._telemetry = telemetry or BoundedMetricRegistry()
         self._executor = ThreadPoolExecutor(
             max_workers=worker_concurrency,
             thread_name_prefix="switchsure-evidence",
@@ -57,6 +71,10 @@ class EvidenceJobService:
     def ready(self) -> bool:
         return self._queue.healthcheck()
 
+    @property
+    def telemetry(self) -> TelemetrySnapshot:
+        return self._telemetry.snapshot()
+
     def submit(
         self,
         *,
@@ -64,11 +82,13 @@ class EvidenceJobService:
         payload: AnalyzeEvidenceRequest,
         idempotency_key: str | None,
     ) -> JobSnapshot:
-        return self._queue.submit(
+        snapshot = self._queue.submit(
             owner_id=capability,
             payload=payload,
             idempotency_key=idempotency_key,
         )
+        self._record_queue_load()
+        return snapshot
 
     def snapshot(self, *, capability: str, job_id: str) -> JobSnapshot:
         return self._queue.snapshot(owner_id=capability, job_id=job_id)
@@ -85,7 +105,16 @@ class EvidenceJobService:
         return self._queue.result(owner_id=capability, job_id=job_id)
 
     def cancel(self, *, capability: str, job_id: str) -> JobSnapshot:
-        return self._queue.cancel(owner_id=capability, job_id=job_id)
+        snapshot = self._queue.cancel(owner_id=capability, job_id=job_id)
+        self._telemetry.record(
+            ContentFreeEvent(
+                kind=TelemetryEventKind.ERROR,
+                stage=PipelineStage.QUEUE,
+                error_class=SafeErrorClass.CANCELLED,
+            )
+        )
+        self._record_queue_load()
+        return snapshot
 
     def retry(
         self,
@@ -94,7 +123,9 @@ class EvidenceJobService:
         job_id: str,
         payload: AnalyzeEvidenceRequest,
     ) -> JobSnapshot:
-        return self._queue.retry(owner_id=capability, job_id=job_id, payload=payload)
+        snapshot = self._queue.retry(owner_id=capability, job_id=job_id, payload=payload)
+        self._record_queue_load()
+        return snapshot
 
     def process_pending(self) -> int:
         """Drain available work while holding one bounded worker slot."""
@@ -106,16 +137,21 @@ class EvidenceJobService:
         try:
             while lease := self._queue.lease_next(worker_id=worker_id):
                 processed += 1
+                started = perf_counter()
+                self._record_queue_load()
                 future = self._executor.submit(self._processor, lease.payload)
                 try:
                     result = future.result(timeout=self._processing_timeout.total_seconds())
                 except TimeoutError:
                     future.cancel()
                     self._safe_fail(lease.job_id, worker_id, "model_timeout")
+                    self._record_error(SafeErrorClass.MODEL_TIMEOUT)
                 except ValueError:
                     self._safe_fail(lease.job_id, worker_id, "invalid_evidence")
+                    self._record_error(SafeErrorClass.INVALID_INPUT)
                 except Exception:
                     self._safe_fail(lease.job_id, worker_id, "model_unavailable")
+                    self._record_error(SafeErrorClass.MODEL_UNAVAILABLE)
                 else:
                     # Owner cancellation wins; content-bearing output is discarded.
                     with suppress(InvalidJobTransitionError):
@@ -124,6 +160,21 @@ class EvidenceJobService:
                             worker_id=worker_id,
                             result=result,
                         )
+                    self._telemetry.record(
+                        ContentFreeEvent(
+                            kind=TelemetryEventKind.ACTION,
+                            action=TelemetryDecisionAction(result.action),
+                        )
+                    )
+                finally:
+                    self._telemetry.record(
+                        ContentFreeEvent(
+                            kind=TelemetryEventKind.STAGE_LATENCY,
+                            stage=PipelineStage.END_TO_END,
+                            latency_ms=(perf_counter() - started) * 1000.0,
+                        )
+                    )
+                    self._record_queue_load()
         finally:
             self._worker_slots.release()
         return processed
@@ -136,6 +187,25 @@ class EvidenceJobService:
         # Cancellation may have invalidated the lease while work was in flight.
         with suppress(InvalidJobTransitionError):
             self._queue.fail(job_id=job_id, worker_id=worker_id, error_code=error_code)
+
+    def _record_error(self, error_class: SafeErrorClass) -> None:
+        self._telemetry.record(
+            ContentFreeEvent(
+                kind=TelemetryEventKind.ERROR,
+                stage=PipelineStage.END_TO_END,
+                error_class=error_class,
+            )
+        )
+
+    def _record_queue_load(self) -> None:
+        load = self._queue.load()
+        self._telemetry.record(
+            ContentFreeEvent(
+                kind=TelemetryEventKind.QUEUE,
+                queue_depth=load.active,
+                queue_capacity=load.capacity,
+            )
+        )
 
 
 __all__ = [

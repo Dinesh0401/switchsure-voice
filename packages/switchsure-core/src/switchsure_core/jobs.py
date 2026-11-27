@@ -73,6 +73,12 @@ class JobSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class JobQueueLoad:
+    active: int
+    capacity: int
+
+
+@dataclass(frozen=True, slots=True)
 class JobLease[PayloadT]:
     job_id: str
     attempt: int
@@ -107,8 +113,8 @@ class PilotJobQueue[PayloadT, ResultT]:
         clock: Callable[[], datetime] = _utc_now,
         id_factory: Callable[[], str] | None = None,
     ) -> None:
-        if capacity < 1:
-            raise ValueError("capacity must be positive")
+        if not 1 <= capacity <= 100_000:
+            raise ValueError("capacity must be between 1 and 100000")
         if lease_timeout <= timedelta(0):
             raise ValueError("lease_timeout must be positive")
         self._capacity = capacity
@@ -416,6 +422,12 @@ class PilotJobQueue[PayloadT, ResultT]:
             except sqlite3.Error:
                 return False
             return row is not None and int(row["healthy"]) == 1
+
+    def load(self) -> JobQueueLoad:
+        """Return content-free active load for backpressure telemetry."""
+
+        with self._lock:
+            return JobQueueLoad(active=self._active_count_locked(), capacity=self._capacity)
 
     def _active_count_locked(self) -> int:
         row = self._connection.execute(
