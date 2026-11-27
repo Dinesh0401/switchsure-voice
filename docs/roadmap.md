@@ -45,6 +45,14 @@ remain pending approved data.
 
 ## Phase 4 — Pilot-quality product
 
+Engineering status: the modular-monolith pilot now has a bounded asynchronous queue, durable
+content-free SQLite lifecycle metadata, ephemeral payload/result retention, TTL deletion, worker
+leases, cancellation, retry with fresh payload, typed errors, capability-scoped anonymous access,
+fixed-cardinality content-free telemetry, and accessible queued/running/error/retry/cancel/typed
+fallback states. Pilot status: not deployable yet; a real GPU worker, authenticated authorization,
+encrypted cross-process payload transport, OpenTelemetry export, full-service load/security tests,
+and manual WCAG/assistive-technology verification remain pending.
+
 - GPU worker and bounded queue, durable metadata, explicit retention.
 - Full WCAG 2.2 AA review and assistive-technology testing.
 - Security/privacy review, observability, load tests, canary evaluation.

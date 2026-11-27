@@ -73,6 +73,16 @@ real-speech study before any performance claim. See the
 [Phase 3 contract](docs/research/phase3-critical-entity-preservation.md), and
 [roadmap](docs/roadmap.md).
 
+Phase 4 engineering now has a bounded asynchronous job lifecycle, content-free durable SQLite
+metadata, ephemeral payload/result retention, capability-scoped anonymous pilot access, worker
+leases and timeouts, privacy-safe fixed-cardinality telemetry, and an accessible browser flow for
+queueing, polling, cancellation, retry, and typed fallback. This is a pilot foundation, not a
+production deployment: the real GPU worker, authenticated accounts, external telemetry export,
+full-service load/security testing, and manual WCAG/assistive-technology review remain gated. See
+the [pilot API contract](docs/api/pilot-jobs.md),
+[observability contract](docs/operations/pilot-observability.md), and
+[accessibility status](docs/product/accessibility-status.md).
+
 The current scorer is an intentionally transparent, uncalibrated baseline. It is suitable for architecture and interaction testing, not for medical, financial, or other consequential decisions. Promotion to a real-world pilot is gated by the speaker-disjoint evaluation contract.
 
 ## Run the vertical slice
